@@ -17,20 +17,35 @@ jobs:
       - name: チェックアウト
         uses: actions/checkout@v4
 
+      - name: 休日チェック
+        id: rest_check
+        run: |
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          if python3 -c "import json; days=json.load(open('rest_days.json'))['rest_days']; exit(0 if '${TODAY}' in days else 1)" 2>/dev/null; then
+            echo "今日 (${TODAY}) は休有持 — スキップします"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Python セットアップ
+        if: steps.rest_check.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: パッケージインストール
+        if: steps.rest_check.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
       - name: ラジオ生成
+        if: steps.rest_check.outputs.skip != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python generate_radio.py
 
       - name: GitHub Pages用に音声をコピー
+        if: steps.rest_check.outputs.skip != 'true'
         run: |
           mkdir -p docs/audio
           for f in 音声/*.mp3; do
@@ -40,6 +55,7 @@ jobs:
           done
 
       - name: 生成ファイルをコミット
+        if: steps.rest_check.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -48,9 +64,11 @@ jobs:
           git push
 
       - name: GitHub Pages デプロイ待ち
+        if: steps.rest_check.outputs.skip != 'true'
         run: sleep 30
 
       - name: LINE送信
+        if: steps.rest_check.outputs.skip != 'true'
         env:
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
